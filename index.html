@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Milwaukee ward population and registration change, 2022–2026</title>
+
+  <link
+    href="https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.css"
+    rel="stylesheet"
+  >
+
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.js"></script>
+
+  <style>
+    html,
+    body,
+    #map {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #map {
+      position: fixed;
+      inset: 0;
+    }
+
+    .legend {
+      position: absolute;
+      right: 16px;
+      bottom: 24px;
+      z-index: 2;
+      width: 300px;
+      padding: 14px;
+      background: rgba(7, 19, 31, 0.96);
+      color: white;
+      border-radius: 8px;
+      font: 12px Arial, sans-serif;
+      line-height: 1.5;
+    }
+
+    .legend-title {
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+
+    .legend-item {
+      margin-top: 8px;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      margin-right: 6px;
+      vertical-align: -2px;
+      border-radius: 2px;
+    }
+
+    .growth-growth {
+      background: #2166ac;
+    }
+
+    .decline-growth {
+      background: #67a9cf;
+    }
+
+    .growth-decline {
+      background: #f4a582;
+    }
+
+    .decline-decline {
+      background: #b2182b;
+    }
+
+    .unmatched {
+      background: #bdbdbd;
+    }
+
+    .popup-heading {
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .mapboxgl-popup-content {
+      font: 13px Arial, sans-serif;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<div class="legend">
+  <div class="legend-title">
+    Milwaukee population and registration change
+  </div>
+
+  <div class="legend-item">
+    <span class="swatch growth-growth"></span>
+    Population grew; registrations grew
+  </div>
+
+  <div class="legend-item">
+    <span class="swatch decline-growth"></span>
+    Population fell; registrations grew
+  </div>
+
+  <div class="legend-item">
+    <span class="swatch growth-decline"></span>
+    Population grew; registrations fell
+  </div>
+
+  <div class="legend-item">
+    <span class="swatch decline-decline"></span>
+    Population fell; registrations fell
+  </div>
+
+  <div class="legend-item">
+    <span class="swatch unmatched"></span>
+    No 98%+ match or insufficient data
+  </div>
+</div>
+
+<script>
+mapboxgl.accessToken =
+  'pk.eyJ1IjoicGtpZWZlciIsImEiOiJjbWxqeWRsNzMwNHV5M3FweTMyemY5emQzIn0.iPzQxYOu7uNUkophKSfiLA';
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [-87.91, 43.05],
+  zoom: 10.5,
+  minZoom: 9,
+  maxZoom: 15
+});
+
+map.addControl(
+  new mapboxgl.NavigationControl(),
+  'top-right'
+);
+
+function formatNumber(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return 'Missing';
+  }
+
+  return Math.round(number).toLocaleString();
+}
+
+function formatPercent(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return 'Missing';
+  }
+
+  return `${(number * 100).toFixed(1)}%`;
+}
+
+function categoryLabel(category) {
+  const labels = {
+    population_growth_registration_growth:
+      'Population grew; registrations grew',
+
+    population_decline_registration_growth:
+      'Population fell; registrations grew',
+
+    population_growth_registration_decline:
+      'Population grew; registrations fell',
+
+    population_decline_registration_decline:
+      'Population fell; registrations fell',
+
+    no_2022_match:
+      'No 98%+ geographic match',
+
+    insufficient_data:
+      'Insufficient data'
+  };
+
+  return labels[category] || 'Insufficient data';
+}
+
+map.on('load', () => {
+
+  map.addSource('wards', {
+    type: 'geojson',
+    data: 'turnout_2026_population_registration_status.geojson'
+  });
+
+  map.addLayer({
+    id: 'ward-fill',
+    type: 'fill',
+    source: 'wards',
+    paint: {
+      'fill-color': [
+        'match',
+        ['get', 'population_registration_category'],
+
+        'population_growth_registration_growth',
+        '#2166ac',
+
+        'population_decline_registration_growth',
+        '#67a9cf',
+
+        'population_growth_registration_decline',
+        '#f4a582',
+
+        'population_decline_registration_decline',
+        '#b2182b',
+
+        '#bdbdbd'
+      ],
+      'fill-opacity': 0.84
+    }
+  });
+
+  map.addLayer({
+    id: 'ward-outline',
+    type: 'line',
+    source: 'wards',
+    paint: {
+      'line-color': '#ffffff',
+      'line-width': 0.4,
+      'line-opacity': 0.85
+    }
+  });
+
+  map.on('click', 'ward-fill', event => {
+    const p = event.features[0].properties;
+
+    new mapboxgl.Popup()
+      .setLngLat(event.lngLat)
+      .setHTML(`
+        <div class="popup-heading">
+          ${p.ward_label || 'Milwaukee ward'}
+        </div>
+
+        <div>
+          Ward ${p.ward_id || ''}
+        </div>
+
+        <hr>
+
+        <div>
+          Classification:
+          <strong>
+            ${categoryLabel(
+              p.population_registration_category
+            )}
+          </strong>
+        </div>
+
+        <hr>
+
+        <div>
+          Estimated population, 2022:
+          <strong>${formatNumber(p.population_2022)}</strong>
+        </div>
+
+        <div>
+          Estimated population, 2024:
+          <strong>${formatNumber(p.population_2024)}</strong>
+        </div>
+
+        <div>
+          Estimated population change:
+          <strong>${formatNumber(p.population_change)}</strong>
+        </div>
+
+        <div>
+          Estimated population change:
+          <strong>${formatPercent(p.population_change_percent)}</strong>
+        </div>
+
+        <hr>
+
+        <div>
+          Registered voters, 2022:
+          <strong>${formatNumber(p.registered_2022)}</strong>
+        </div>
+
+        <div>
+          Registered voters, 2026:
+          <strong>${formatNumber(p.registered_2026)}</strong>
+        </div>
+
+        <div>
+          Registration change:
+          <strong>${formatNumber(p.registration_change)}</strong>
+        </div>
+      `)
+      .addTo(map);
+  });
+
+  map.on('mouseenter', 'ward-fill', () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+
+  map.on('mouseleave', 'ward-fill', () => {
+    map.getCanvas().style.cursor = '';
+  });
+});
+</script>
+
+</body>
+</html>
